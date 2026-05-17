@@ -4,7 +4,7 @@
   </h1>
 
   <p align="center">
-    <strong>Self-Corrective LangGraph Workflow for Technical Document Analysis</strong>
+    <strong>An AI Technical Documentation Assistant</strong>
   </p>
 
   <p align="center">

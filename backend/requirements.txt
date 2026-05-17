@@ -1,0 +1,42 @@
+fastapi[standard]==0.115.6
+uvicorn[standard]==0.32.1
+python-dotenv==1.0.1
+pydantic-settings==2.7.1
+pydantic==2.10.5
+
+# LangChain / LangGraph
+langchain-core>=0.3.33,<0.4.0
+langchain-community>=0.3.14,<0.4.0
+langchain-groq>=0.2.4,<1.0.0
+langchain-google-genai>=2.0.8,<3.0.0
+langchain-anthropic>=0.3.1,<1.0.0
+langchain-openai>=0.3.0,<1.0.0
+langchain-text-splitters>=0.3.4,<1.0.0
+langgraph>=0.2.62,<1.0.0
+
+# Supabase
+supabase==2.11.0
+PyJWT==2.10.1
+
+# Vector store
+qdrant-client==1.12.2
+sentence-transformers==3.3.1
+
+# Encryption
+cryptography==44.0.0
+
+# PDF export
+fpdf2==2.8.2
+
+# Web search fallback
+tavily-python==0.5.0
+
+# Document processing
+python-multipart==0.0.20
+httpx==0.28.1
+PyPDF2==3.0.1
+pymupdf==1.25.3
+python-docx==1.1.2
+beautifulsoup4==4.12.3
+Pillow==11.1.0
+pytesseract==0.3.13

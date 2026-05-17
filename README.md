@@ -1,7 +1,10 @@
 <div align="center">
-  <img src="https://raw.githubusercontent.com/Manwikkk/exics_ai/main/public/logo.png" alt="Exics AI Logo" width="150" onerror="this.src='https://img.icons8.com/?size=256&id=104051&format=png'"/>
+  <img src="logo.svg" alt="Exics AI Logo" width="120" />
   
-  <h1 align="center">🧬 Exics AI: Intelligent RAG Assistant</h1>
+  <h1 align="center">
+    <img src="https://readme-typing-svg.herokuapp.com/?font=Inter&weight=700&size=32&pause=1000&color=000000&center=true&vCenter=true&width=1000&lines=Exics+AI+-+RAG-Based+Technical+Documentation+Assistant;Exics+AI+-+Medical+Document+Analysis+Pipeline;Exics+AI+-+Agentic+Research+Companion" alt="Exics AI - RAG-Based Technical Documentation Assistant" />
+  </h1>
+
   <p align="center">
     <strong>Advanced Medical & Technical Document Analysis Pipeline</strong>
   </p>
@@ -22,36 +25,87 @@
 **Exics AI** is a state-of-the-art Retrieval-Augmented Generation (RAG) platform designed to ingest, process, and query complex technical and medical documents. By combining a **FastAPI** backend with a dynamic **LangGraph** orchestrator and a sleek **React** frontend, Exics AI ensures that users can converse with their data without context-bleeding or hallucination.
 
 ### Key Features
-- 📄 **Document-Aware Memory**: Strict per-chat document scoping ensures context doesn't bleed across different research sessions.
-- 🧠 **LangGraph Agentic RAG**: Complex query analysis, document retrieval, and answer generation are handled robustly via a cyclic directed graph.
-- ⚡ **Real-Time UI**: TanStack Start + Tailwind frontend providing an app-like experience for uploading and chatting with PDFs.
-- 🗄️ **Persistent Vector Store**: High-performance semantic search powered by Qdrant and local SentenceTransformers.
+- **Document-Aware Memory**: Strict per-chat document scoping ensures context doesn't bleed across different research sessions.
+- **LangGraph Agentic RAG**: Complex query analysis, document retrieval, and answer generation are handled robustly via a cyclic directed graph.
+- **Real-Time UI**: TanStack Start + Tailwind frontend providing an app-like experience for uploading and chatting with PDFs.
+- **Persistent Vector Store**: High-performance semantic search powered by Qdrant and local SentenceTransformers.
 
 ---
 
-## 🏗 Architecture
+## 🏗 System Architecture
 
-The system is decoupled into two main services:
+```mermaid
+graph TD
+    %% Styling
+    classDef frontend fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#fff;
+    classDef backend fill:#1e293b,stroke:#10b981,stroke-width:2px,color:#fff;
+    classDef external fill:#0f172a,stroke:#eab308,stroke-width:2px,color:#fff;
+    
+    subgraph Frontend [UI Layer - React & TanStack Start]
+        UI[User Interface]:::frontend
+        Chat[Chat Interface]:::frontend
+        DocUp[Document Upload]:::frontend
+    end
 
-1. **Frontend (`/src`)**: A React application utilizing TanStack Start, Tailwind CSS, and shadcn/ui. It manages user state, active chat sessions, PDF uploads, and streams AI responses.
-2. **Backend (`/backend`)**: A robust FastAPI application that handles:
-   - **Ingestion**: PyPDF2/PyMuPDF extraction and Langchain `RecursiveCharacterTextSplitter`.
-   - **Storage**: Supabase for relational data (chats, users, document metadata) and Qdrant for high-dimensional vector embeddings.
-   - **RAG Pipeline**: A stateful LangGraph implementation with nodes for `Query Analysis`, `Retrieval`, and `Generation`.
+    subgraph Backend [API Layer - FastAPI]
+        API[FastAPI Endpoints]:::backend
+        Ingest[Document Ingestion]:::backend
+        Auth[Auth Service]:::backend
+        
+        subgraph Orchestrator [LangGraph RAG Agent]
+            QA[Query Analysis]:::backend
+            Ret[Retrieval Node]:::backend
+            Gen[Generation Node]:::backend
+            Fallback[Web Search Fallback]:::backend
+        end
+    end
 
-### Logical Flow
-`User Uploads PDF` ➡️ `FastAPI Ingest Endpoint` ➡️ `Text Splitter` ➡️ `Embedding Model` ➡️ `Qdrant Vector DB` 
-`User Asks Question` ➡️ `LangGraph Orchestrator` ➡️ `Retrieval (Qdrant)` ➡️ `LLM Generation` ➡️ `User UI`
+    subgraph Infrastructure [Data Storage & External Services]
+        Supabase[(Supabase - Relational DB)]:::external
+        Qdrant[(Qdrant - Vector DB)]:::external
+        LLM[LLM APIs / Groq / OpenAI]:::external
+    end
+
+    %% Flow connections
+    DocUp -->|PDF / Doc| Ingest
+    Chat -->|Query Context| API
+    UI --> Auth
+
+    Ingest -->|Text Chunks| Qdrant
+    API --> QA
+    QA -->|Determine intent| Ret
+    QA -->|Not in docs| Fallback
+    Ret -->|Fetch similar vectors| Qdrant
+    Ret --> Gen
+    Fallback --> Gen
+    Gen -->|Response & Sources| Chat
+    Gen --> LLM
+
+    Auth -.-> Supabase
+```
+
+---
+
+## 📂 Project Structure
+
+| Directory / Component | Description | Technologies |
+| :--- | :--- | :--- |
+| **`/src`** | Modern frontend UI allowing users to upload documents and chat with context. | React, TanStack Start, Tailwind, shadcn/ui |
+| **`/backend/api`** | RESTful API endpoints for ingestion, query, and history management. | FastAPI |
+| **`/backend/graph`** | Stateful workflow orchestrator routing queries through RAG steps. | LangGraph, Langchain |
+| **`/backend/services`**| Handlers for specific business logic: embeddings, vector DB, auth. | PyPDF2, SentenceTransformers |
+| **`Qdrant`** | High-performance vector database to store and search document embeddings. | Qdrant Client |
+| **`Supabase`** | PostgreSQL database for robust relational storage of users, chats, docs. | Supabase Client |
 
 ---
 
 ## 🚀 Setup Instructions
 
 ### Prerequisites
-- Python 3.10+
-- Node.js 18+ & Bun (or npm)
-- Supabase Account (for PostgreSQL)
-- Qdrant (Local or Cloud)
+- **Python 3.10+**
+- **Node.js 18+** & npm (or bun)
+- **Supabase Account** (for PostgreSQL)
+- **Qdrant** (Local or Cloud)
 
 ### Environment Variables
 Create a `.env` file in the `/backend` directory:
@@ -72,7 +126,9 @@ GROQ_API_KEY=your_groq_api_key
 OPENAI_API_KEY=your_openai_api_key
 ```
 
-### Running the Backend
+### Running the Application
+
+#### 1. Start the Backend
 ```bash
 cd backend
 python -m venv venv
@@ -84,7 +140,7 @@ pip install -r requirements.txt
 uvicorn main:app --reload --port 8000
 ```
 
-### Running the Frontend
+#### 2. Start the Frontend
 ```bash
 # In the root directory
 npm install
@@ -157,10 +213,13 @@ The decision to use **LangGraph** instead of standard Langchain sequential chain
 2. **Local vs API Embeddings**: Utilizing local `sentence-transformers` saves cost and ensures data privacy (crucial for medical data), but shifts the compute burden to the hosting server.
 3. **Database**: Supabase provides immediate out-of-the-box Auth and PostgreSQL. Qdrant is specifically optimized for vector operations. Keeping relational data and vector data separate ensures we use the best tool for each specific job.
 
-### What I Would Improve With More Time
+### Future Improvements
 - **Hybrid Search**: Implementing Sparse-Dense hybrid search (e.g., BM25 + Vector) in Qdrant to better handle exact keyword matches (like specific drug names or gene sequences).
 - **Advanced OCR**: Integrating Vision LLMs or advanced Tesseract pipelines to ingest charts and tables from medical PDFs.
 - **Streaming UI**: Polishing the frontend to handle Server-Sent Events (SSE) for word-by-word streaming of LLM responses, improving perceived latency.
 
----
-*Built with ❤️ for Exics AI.*
+<br />
+
+<div align="center">
+  <i>Built with dedication for Exics AI.</i>
+</div>

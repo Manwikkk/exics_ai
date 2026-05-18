@@ -11,6 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useExics } from "@/lib/exics/store";
+import { DEFAULT_PROVIDER_MODELS } from "@/lib/exics/constants";
 import { MODELS, type ProviderId, type ProviderKeyStatus } from "@/lib/exics/types";
 import { deleteApiKey, getProviderStatus, saveApiKey } from "@/lib/exics/api";
 import { API_KEY_MESSAGES, hasAnyProviderKey } from "@/lib/exics/provider-keys";
@@ -41,6 +42,10 @@ export function SettingsDialog({
     disableGroqDefault,
     enableGroqDefault,
     refreshProviderStatus,
+    providerModels,
+    setProviderModel,
+    theme,
+    toggleTheme,
     webSearchEnabled,
     toggleWebSearch,
     incognito,
@@ -67,22 +72,22 @@ export function SettingsDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-2xl p-0 overflow-hidden">
-          <DialogHeader className="px-6 pt-6 pb-3">
+        <DialogContent className="max-w-2xl w-[calc(100vw-2rem)] h-[min(90dvh,680px)] p-0 flex flex-col overflow-hidden">
+          <DialogHeader className="px-6 pt-6 pb-3 shrink-0">
             <DialogTitle className="text-base font-medium">Settings</DialogTitle>
             <DialogDescription className="text-xs">
               Manage providers, preferences, and chat data.
             </DialogDescription>
           </DialogHeader>
-          <Tabs defaultValue="keys" className="w-full">
-            <TabsList className="mx-6 bg-secondary">
+          <Tabs defaultValue="keys" className="w-full flex flex-col flex-1 min-h-0">
+            <TabsList className="mx-6 bg-secondary shrink-0 flex-wrap h-auto gap-1">
               <TabsTrigger value="keys">API Keys</TabsTrigger>
               <TabsTrigger value="preferences">Preferences</TabsTrigger>
               <TabsTrigger value="data">Data</TabsTrigger>
               <TabsTrigger value="account">Account</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="keys" className="px-6 py-4 space-y-3">
+            <TabsContent value="keys" className="px-6 py-4 space-y-3 flex-1 min-h-0 overflow-y-auto mt-0 data-[state=inactive]:hidden">
               <p className="text-xs text-muted-foreground">
                 Custom keys are stored locally in your browser. Groq uses the built-in server key by
                 default — replace it only if you want your own quota.
@@ -151,6 +156,8 @@ export function SettingsDialog({
                       await refreshProviderStatus();
                       toast.success(`${m.name} key saved`);
                     }}
+                    modelId={providerModels[m.id] || DEFAULT_PROVIDER_MODELS[m.id]}
+                    onModelIdChange={(v) => setProviderModel(m.id, v)}
                     onRemove={async () => {
                       if (isGroq && usesServerDefault) {
                         disableGroqDefault();
@@ -186,7 +193,7 @@ export function SettingsDialog({
               })}
             </TabsContent>
 
-            <TabsContent value="preferences" className="px-6 py-4 space-y-1">
+            <TabsContent value="preferences" className="px-6 py-4 space-y-1 flex-1 min-h-0 overflow-y-auto mt-0 data-[state=inactive]:hidden">
               <ToggleRow
                 title="Web search"
                 description="Search the web when needed. Sources appear only for web-backed answers."
@@ -200,28 +207,31 @@ export function SettingsDialog({
                 onCheckedChange={toggleIncognito}
               />
               <ToggleRow
-                title="Theme"
-                description="Dark theme (fixed in this release)."
-                checked
-                disabled
-                onCheckedChange={() => {}}
+                title="Light mode"
+                description="Switch between light and dark appearance."
+                checked={theme === "light"}
+                onCheckedChange={() => toggleTheme()}
               />
             </TabsContent>
 
-            <TabsContent value="data" className="px-6 py-4 space-y-3">
+            <TabsContent value="data" className="px-6 py-4 space-y-3 flex-1 min-h-0 overflow-y-auto mt-0 data-[state=inactive]:hidden">
               <ClearHistoryRow onClear={() => setConfirmClear(true)} />
             </TabsContent>
 
-            <TabsContent value="account" className="px-6 py-4 space-y-3">
+            <TabsContent value="account" className="px-6 py-4 space-y-3 flex-1 min-h-0 overflow-y-auto mt-0 data-[state=inactive]:hidden">
               {user ? (
                 <>
                   <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-full bg-accent flex items-center justify-center text-sm">
+                    <div className="h-10 w-10 rounded-full bg-accent flex items-center justify-center text-sm font-medium">
                       {user.name.slice(0, 1).toUpperCase()}
                     </div>
-                    <div>
-                      <p className="text-sm">{user.name}</p>
-                      <p className="text-xs text-muted-foreground">{user.email}</p>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-foreground leading-tight">
+                        {user.name}
+                      </p>
+                      <p className="text-xs text-muted-foreground truncate mt-0.5">
+                        {user.email}
+                      </p>
                     </div>
                   </div>
                   <Button variant="secondary" size="sm" onClick={signOut}>
@@ -292,6 +302,8 @@ function ApiKeyRow({
   isServerDefault,
   canRestoreDefault,
   onRestoreDefault,
+  modelId,
+  onModelIdChange,
   onSave,
   onRemove,
 }: {
@@ -304,6 +316,8 @@ function ApiKeyRow({
   isServerDefault?: boolean;
   canRestoreDefault?: boolean;
   onRestoreDefault?: () => void;
+  modelId?: string;
+  onModelIdChange?: (model: string) => void;
   onSave: (key: string) => void;
   onRemove: () => void | Promise<void>;
 }) {
@@ -312,8 +326,8 @@ function ApiKeyRow({
 
   return (
     <div className="py-3 border-b border-border last:border-b-0" data-provider={providerId}>
-      <div className="flex items-center justify-between gap-4">
-        <div className="min-w-0">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+        <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
             <p className="text-sm">{name}</p>
             <span
@@ -330,6 +344,23 @@ function ApiKeyRow({
             )}
           </div>
           <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
+          {onModelIdChange && (
+            <div className="mt-2 flex items-center gap-2 max-w-md">
+              <label
+                htmlFor={`model-${providerId}`}
+                className="text-[11px] text-muted-foreground shrink-0"
+              >
+                Model ID
+              </label>
+              <Input
+                id={`model-${providerId}`}
+                value={modelId ?? ""}
+                onChange={(e) => onModelIdChange(e.target.value)}
+                placeholder={DEFAULT_PROVIDER_MODELS[providerId]}
+                className="h-8 text-xs bg-input/40 border-border"
+              />
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
           {!editing && (

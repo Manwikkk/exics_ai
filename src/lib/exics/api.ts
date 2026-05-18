@@ -53,6 +53,7 @@ export interface QueryParams {
   chat_history?: Pick<ChatMessage, "role" | "content">[];
   provider_api_key?: string;
   groq_use_server_default?: boolean;
+  model_name?: string;
 }
 
 export interface StreamCallbacks {
@@ -83,18 +84,21 @@ export async function queryStream(
       const detail = parsed?.detail;
       if (typeof detail === "string") {
         callbacks.onError(detail);
+        callbacks.onDone();
         return;
       }
     } catch {
       // fall through
     }
     callbacks.onError(text || `HTTP ${res.status}`);
+    callbacks.onDone();
     return;
   }
 
   const reader = res.body?.getReader();
   if (!reader) {
     callbacks.onError("No response body");
+    callbacks.onDone();
     return;
   }
 
@@ -135,6 +139,7 @@ export async function queryStream(
                 break;
               case "error":
                 callbacks.onError(parsed.error ?? "Unknown error");
+                callbacks.onDone();
                 break;
               case "done":
                 callbacks.onDone();

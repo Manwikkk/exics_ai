@@ -16,6 +16,15 @@ PROVIDER_DISPLAY: dict[str, str] = {
 
 MSG_NONE = "Add at least one API key in Settings to continue."
 MSG_PROVIDER = "Add an API key for {name} in Settings to use this model."
+MSG_WEB_SEARCH = (
+    "Web search could not fetch results. Add TAVILY_API_KEY to the server .env "
+    "and try again."
+)
+MSG_MODEL = (
+    'The model "{model}" is not available for {provider}. '
+    "Open Settings and set a valid model ID for this provider."
+)
+MSG_GENERIC = "Something went wrong while generating a response. Please try again."
 
 
 def provider_display_name(provider: str) -> str:
@@ -70,25 +79,58 @@ def any_provider_available(
     return False
 
 
-def friendly_llm_error(exc: BaseException, provider: str) -> str:
-    """Map provider HTTP/auth failures to a user-facing message (no raw API bodies)."""
+def friendly_llm_error(
+    exc: BaseException,
+    provider: str,
+    *,
+    model_name: str | None = None,
+    web_search_enabled: bool = False,
+) -> str:
+    """Map provider failures to clear user-facing messages (avoid blaming API keys incorrectly)."""
     msg = str(exc).lower()
+    name = provider_display_name(provider)
+
     auth_markers = (
         "api key",
         "api_key",
+        "invalid api key",
+        "incorrect api key",
+        "invalid_api_key",
         "authentication",
         "unauthorized",
         "invalid x-api-key",
-        "incorrect api key",
-        "invalid_api_key",
-        "permission",
-        "401",
-        "403",
     )
     if any(marker in msg for marker in auth_markers):
-        name = provider_display_name(provider)
         return MSG_PROVIDER.format(name=name)
-    return (
-        "Something went wrong while generating a response. "
-        "Check your API key in Settings and try again."
+
+    model_markers = (
+        "model_not_found",
+        "model not found",
+        "does not exist",
+        "decommissioned",
+        "deprecated",
+        "invalid model",
+        "unsupported model",
+        "unknown model",
     )
+    if any(marker in msg for marker in model_markers) or (
+        "model" in msg and any(k in msg for k in ("not found", "decommissioned", "deprecated", "invalid"))
+    ):
+        model = (model_name or "unknown").strip() or "unknown"
+        return MSG_MODEL.format(model=model, provider=name)
+
+    if web_search_enabled and any(
+        k in msg for k in ("tavily", "serper", "web search", "search")
+    ):
+        return MSG_WEB_SEARCH
+
+    if "rate" in msg and "limit" in msg:
+        return f"{name} rate limit reached. Wait a moment and try again."
+
+    if "timeout" in msg or "timed out" in msg:
+        return "The request timed out. Try again with a shorter question."
+
+    if "context" in msg and ("length" in msg or "window" in msg or "token" in msg):
+        return "The conversation or context is too long. Start a new chat or shorten your message."
+
+    return MSG_GENERIC

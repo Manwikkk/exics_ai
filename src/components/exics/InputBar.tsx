@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { ArrowUp, Globe, Mic, Paperclip, Square, X, FileText, Image as ImageIcon } from "lucide-react";
 import { ModelSelector } from "./ModelSelector";
 import { useExics } from "@/lib/exics/store";
@@ -14,7 +14,10 @@ interface Props {
   onStop: () => void;
 }
 
-// Minimal speech recognition typings
+export type InputBarHandle = {
+  addFiles: (files: File[]) => void;
+};
+
 interface SpeechRecognitionLike {
   start: () => void;
   stop: () => void;
@@ -26,8 +29,11 @@ interface SpeechRecognitionLike {
   onerror: ((e: any) => void) | null;
 }
 
-export function InputBar({ onSend, onOpenSettings, generating, uploading = false, onStop }: Props) {
-  const { webSearchEnabled, toggleWebSearch } = useExics();
+export const InputBar = forwardRef<InputBarHandle, Props>(function InputBar(
+  { onSend, onOpenSettings, generating, uploading = false, onStop },
+  ref,
+) {
+  const { webSearchEnabled, toggleWebSearch, incognito } = useExics();
   const [text, setText] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [listening, setListening] = useState(false);
@@ -37,7 +43,6 @@ export function InputBar({ onSend, onOpenSettings, generating, uploading = false
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const fileMapRef = useRef<Map<string, File>>(new Map());
 
-  // Autosize textarea
   useEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
@@ -45,11 +50,21 @@ export function InputBar({ onSend, onOpenSettings, generating, uploading = false
     el.style.height = Math.min(el.scrollHeight, 220) + "px";
   }, [text]);
 
+  function fileKey(f: File) {
+    return `${f.name}\0${f.size}\0${f.lastModified}`;
+  }
+
   function handleFiles(files: FileList | null) {
     if (!files) return;
     const list: Attachment[] = [];
+    const existing = new Set(
+      [...fileMapRef.current.values()].map(fileKey),
+    );
     for (let i = 0; i < files.length; i++) {
       const f = files[i];
+      const key = fileKey(f);
+      if (existing.has(key)) continue;
+      existing.add(key);
       const id = Math.random().toString(36).slice(2);
       list.push({
         id,
@@ -59,8 +74,18 @@ export function InputBar({ onSend, onOpenSettings, generating, uploading = false
       });
       fileMapRef.current.set(id, f);
     }
+    if (list.length === 0) return;
     setAttachments((p) => [...p, ...list]);
   }
+
+  useImperativeHandle(ref, () => ({
+    addFiles: (files: File[]) => {
+      if (!files.length) return;
+      const dt = new DataTransfer();
+      for (const f of files) dt.items.add(f);
+      handleFiles(dt.files);
+    },
+  }));
 
   function startDictation() {
     const SR: any =
@@ -103,7 +128,6 @@ export function InputBar({ onSend, onOpenSettings, generating, uploading = false
     const trimmed = text.trim();
     if (!trimmed && attachments.length === 0) return;
     if (generating || uploading) return;
-    // Collect actual File objects for upload
     const files: File[] = [];
     for (const a of attachments) {
       const f = fileMapRef.current.get(a.id);
@@ -124,15 +148,18 @@ export function InputBar({ onSend, onOpenSettings, generating, uploading = false
       onDragLeave={() => setDragOver(false)}
       onDrop={(e) => {
         e.preventDefault();
+        e.stopPropagation();
         setDragOver(false);
         handleFiles(e.dataTransfer.files);
       }}
       className={cn(
-        "w-full rounded-2xl border border-border bg-card transition-colors",
-        dragOver && "border-foreground/30 bg-accent/40"
+        "w-full rounded-2xl border bg-card transition-[border-color,box-shadow,background-color] duration-200",
+        incognito ? "border-dashed border-border/90" : "border-border",
+        dragOver && "border-foreground/30 bg-accent/40",
+        webSearchEnabled && "ring-1 ring-primary/25",
+        listening && "ring-1 ring-primary/20",
       )}
     >
-      {/* Attachments preview */}
       {attachments.length > 0 && (
         <div className="px-3 pt-3 flex flex-wrap gap-2">
           {attachments.map((a) => {
@@ -157,7 +184,6 @@ export function InputBar({ onSend, onOpenSettings, generating, uploading = false
         </div>
       )}
 
-      {/* Textarea */}
       <div className="px-3 pt-3">
         <textarea
           ref={textareaRef}
@@ -170,18 +196,15 @@ export function InputBar({ onSend, onOpenSettings, generating, uploading = false
             }
           }}
           placeholder={
-            uploading
-              ? "Indexing your document(s)…"
-              : listening
-                ? "Listening…"
-                : "Ask about your documents or attach a PDF…"
+            incognito
+              ? "How can I help you today?"
+              : "Attach a technical document and ask about it…"
           }
           rows={1}
           className="w-full bg-transparent resize-none outline-none text-[15px] text-foreground placeholder:text-muted-foreground leading-6 max-h-[220px]"
         />
       </div>
 
-      {/* Toolbar */}
       <div className="flex items-center gap-1 px-2 pb-2 pt-1">
         <input
           ref={fileInputRef}
@@ -194,19 +217,16 @@ export function InputBar({ onSend, onOpenSettings, generating, uploading = false
             e.target.value = "";
           }}
         />
-        <ToolButton
-          label="Attach files"
-          onClick={() => fileInputRef.current?.click()}
-        >
+        <ToolButton label="Attach files" onClick={() => fileInputRef.current?.click()}>
           <Paperclip size={16} />
         </ToolButton>
         <ToolButton
-          label={webSearchEnabled ? "Web search: on" : "Web search: off"}
+          label={webSearchEnabled ? "Web Search: on" : "Web Search: off"}
           active={webSearchEnabled}
           onClick={toggleWebSearch}
         >
           <Globe size={16} />
-          <span className="hidden sm:inline ml-1 text-xs">Web</span>
+          <span className="hidden sm:inline ml-1 text-xs">Web Search</span>
         </ToolButton>
         <ToolButton
           label={listening ? "Stop dictation" : "Voice dictation"}
@@ -242,7 +262,7 @@ export function InputBar({ onSend, onOpenSettings, generating, uploading = false
       </div>
     </div>
   );
-}
+});
 
 function ToolButton({
   children,
@@ -260,9 +280,12 @@ function ToolButton({
       onClick={onClick}
       title={label}
       aria-label={label}
+      aria-pressed={active}
       className={cn(
-        "inline-flex items-center h-8 px-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors",
-        active && "text-foreground bg-accent"
+        "inline-flex items-center h-8 px-2 rounded-md transition-all duration-200",
+        active
+          ? "text-foreground bg-primary/15 ring-1 ring-primary/30 shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.15)]"
+          : "text-muted-foreground hover:text-foreground hover:bg-accent/70",
       )}
     >
       {children}

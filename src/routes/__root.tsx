@@ -6,7 +6,9 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { Toaster } from "@/components/ui/sonner";
+import { useExics } from "@/lib/exics/store";
 
 import appCss from "../styles.css?url";
 
@@ -46,11 +48,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Exics — AI technical documentation assistant" },
+      { title: "Exics" },
       { name: "description", content: "Exics is a calm, minimal AI workspace for technical documentation." },
-      { name: "theme-color", content: "#1a1a1a" },
+      { name: "theme-color", content: "#f7f6f4" },
     ],
-    links: [{ rel: "stylesheet", href: appCss }],
+    links: [
+      { rel: "stylesheet", href: appCss },
+      { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
+    ],
   }),
   shellComponent: RootShell,
   component: RootComponent,
@@ -60,7 +65,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" className="dark" suppressHydrationWarning>
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
@@ -82,8 +87,23 @@ function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   return (
     <QueryClientProvider client={queryClient}>
+      <ThemeSync />
       <Outlet />
-      <Toaster position="bottom-center" theme="dark" />
+      <Toaster position="bottom-center" />
     </QueryClientProvider>
   );
+}
+
+function ThemeSync() {
+  const theme = useExics((s) => s.theme);
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.remove("dark", "light");
+    root.classList.add(theme);
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) {
+      meta.setAttribute("content", theme === "light" ? "#f7f6f4" : "#1a1a1a");
+    }
+  }, [theme]);
+  return null;
 }

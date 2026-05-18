@@ -159,7 +159,7 @@ async def _stream_response(
         "has_uploaded_docs": bool(doc_ids),
         "hallucination_score": "",
         "selected_provider": provider,
-        "selected_model": "",
+        "selected_model": (request.model_name or "").strip() or None,
         "user_api_key": api_key,
         "chat_history": chat_history,
         "chat_id": request.chat_id,
@@ -174,7 +174,7 @@ async def _stream_response(
         result = await _run_graph(state)
     except Exception as exc:
         logger.error("Graph execution failed: %s", exc)
-        yield f"event: error\ndata: {json.dumps({'error': friendly_llm_error(exc, provider)})}\n\n"
+        yield f"event: error\ndata: {json.dumps({'error': friendly_llm_error(exc, provider, model_name=request.model_name, web_search_enabled=request.web_search)})}\n\n"
         return
 
     generation_text = result.get("generation", "")
@@ -182,7 +182,7 @@ async def _stream_response(
     error = result.get("error")
 
     if error and not generation_text:
-        yield f"event: error\ndata: {json.dumps({'error': friendly_llm_error(Exception(error), provider)})}\n\n"
+        yield f"event: error\ndata: {json.dumps({'error': friendly_llm_error(Exception(error), provider, model_name=request.model_name, web_search_enabled=request.web_search)})}\n\n"
         return
 
     # Stream tokens in small chunks for Claude-like feel

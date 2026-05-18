@@ -20,6 +20,9 @@ dist-ssr
 .wrangler/
 .dev.vars
 
+# Lovable platform (not required to run the app)
+.lovable/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

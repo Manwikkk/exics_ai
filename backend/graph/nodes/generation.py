@@ -113,6 +113,7 @@ def generation(state: GraphState) -> GraphState:
     web_results = state.get("web_search_results", [])
     provider = state.get("selected_provider", "groq")
     api_key = state.get("user_api_key")
+    model_name = state.get("selected_model") or None
     chat_history = state.get("chat_history", [])
     doc_names = state.get("active_doc_names", [])
     has_uploaded_docs = state.get("has_uploaded_docs") or bool(state.get("doc_ids", []))
@@ -206,7 +207,13 @@ def generation(state: GraphState) -> GraphState:
         )
 
     try:
-        llm = get_llm(provider, api_key, streaming=False, temperature=0.15)
+        llm = get_llm(
+            provider,
+            api_key,
+            model_name=model_name,
+            streaming=False,
+            temperature=0.15,
+        )
         result = llm.invoke(messages)
         content = result.content if isinstance(result.content, str) else str(result.content)
 
@@ -222,7 +229,12 @@ def generation(state: GraphState) -> GraphState:
 
     except Exception as exc:
         logger.error("Generation failed: %s", exc)
-        friendly = friendly_llm_error(exc, provider)
+        friendly = friendly_llm_error(
+            exc,
+            provider,
+            model_name=model_name,
+            web_search_enabled=web_enabled,
+        )
         return {
             **state,
             "generation": friendly,

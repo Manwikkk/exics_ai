@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 80" role="img" aria-label="Exics AI">
+  <defs>
+    <linearGradient id="exicsGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#c9a87c">
+        <animate attributeName="stop-color" values="#c9a87c;#e8dcc8;#c9a87c" dur="4s" repeatCount="indefinite"/>
+      </stop>
+      <stop offset="50%" stop-color="#e8e4dc">
+        <animate attributeName="stop-color" values="#e8e4dc;#c9a87c;#e8e4dc" dur="4s" repeatCount="indefinite"/>
+      </stop>
+      <stop offset="100%" stop-color="#c9a87c">
+        <animate attributeName="stop-color" values="#c9a87c;#e8dcc8;#c9a87c" dur="4s" repeatCount="indefinite"/>
+      </stop>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="1.2" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <text x="260" y="54" text-anchor="middle" font-family="Georgia, 'Source Serif 4', serif" font-size="48" font-weight="500" fill="url(#exicsGrad)" filter="url(#glow)">Exics AI</text>
+</svg>

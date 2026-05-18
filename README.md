@@ -1,6 +1,6 @@
 <div align="center">
   <h1 align="center">
-    <img src="heading.svg" alt="Exics AI - RAG-Based Technical Documentation Assistant" />
+    <img src="public/heading.svg" width="420" alt="Exics AI — RAG-Based Technical Documentation Assistant" />
   </h1>
 
   <p align="center">
@@ -27,6 +27,17 @@
 - **Document-Aware Memory**: Strict per-chat document scoping ensures context doesn't bleed across different technical research sessions.
 - **Real-Time UI**: TanStack Start + Tailwind frontend providing an app-like experience for uploading and chatting with technical PDFs or docs.
 - **Persistent Vector Store**: High-performance semantic search powered by Qdrant and local SentenceTransformers.
+
+## 📸 Screenshots
+
+### Homepage
+![Homepage](1.PNG)
+
+### Chats Layout
+![Chats Layout](2.PNG)
+
+### LLM Models Structure
+![LLM Models Structure](3.PNG)
 
 ---
 

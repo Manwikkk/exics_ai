@@ -23,11 +23,11 @@ _PROVIDER_MAP: dict[str, dict[str, str]] = {
     },
     "gemini": {
         "cls": "langchain_google_genai.ChatGoogleGenerativeAI",
-        "model": "gemini-1.5-flash",
+        "model": "gemini-2.0-flash",
     },
     "claude": {
         "cls": "langchain_anthropic.ChatAnthropic",
-        "model": "claude-3-5-sonnet-20241022",
+        "model": "claude-sonnet-4-20250514",
     },
     "openai": {
         "cls": "langchain_openai.ChatOpenAI",
@@ -49,6 +49,7 @@ def get_llm(
     provider: str,
     api_key: str | None = None,
     *,
+    model_name: str | None = None,
     streaming: bool = False,
     temperature: float = 0.1,
     **kwargs: Any,
@@ -71,7 +72,7 @@ def get_llm(
         raise ValueError(f"No API key available for provider '{provider}'")
 
     cls = _import_class(info["cls"])
-    model_name = info["model"]
+    resolved_model = (model_name or "").strip() or info["model"]
 
     # Each provider uses slightly different kwarg names
     init_kwargs: dict[str, Any] = {
@@ -82,18 +83,23 @@ def get_llm(
 
     if provider == "groq":
         init_kwargs["groq_api_key"] = key
-        init_kwargs["model_name"] = model_name
+        init_kwargs["model_name"] = resolved_model
     elif provider == "gemini":
         init_kwargs["google_api_key"] = key
-        init_kwargs["model"] = model_name
+        init_kwargs["model"] = resolved_model
     elif provider == "claude":
         init_kwargs["anthropic_api_key"] = key
-        init_kwargs["model_name"] = model_name
+        init_kwargs["model_name"] = resolved_model
     elif provider == "openai":
         init_kwargs["openai_api_key"] = key
-        init_kwargs["model_name"] = model_name
+        init_kwargs["model_name"] = resolved_model
 
-    logger.info("Creating LLM: provider=%s model=%s streaming=%s", provider, model_name, streaming)
+    logger.info(
+        "Creating LLM: provider=%s model=%s streaming=%s",
+        provider,
+        resolved_model,
+        streaming,
+    )
     return cls(**init_kwargs)
 
 
@@ -102,4 +108,10 @@ def get_fast_llm(*, streaming: bool = False) -> BaseChatModel:
     Return a fast, cheap LLM for internal tasks (grading, hallucination
     checks, query rewriting).  Always uses the server-side Groq key.
     """
-    return get_llm("groq", api_key=settings.groq_api_key, streaming=streaming, temperature=0.0)
+    return get_llm(
+        "groq",
+        api_key=settings.groq_api_key,
+        model_name=_PROVIDER_MAP["groq"]["model"],
+        streaming=streaming,
+        temperature=0.0,
+    )

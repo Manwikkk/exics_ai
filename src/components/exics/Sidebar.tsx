@@ -36,11 +36,12 @@ import {
 interface Props {
   open: boolean;
   onToggle: () => void;
+  onNewChat: () => void;
   onOpenSettings: () => void;
   onOpenAuth: () => void;
 }
 
-export function Sidebar({ open, onToggle, onOpenSettings, onOpenAuth }: Props) {
+export function Sidebar({ open, onToggle, onNewChat, onOpenSettings, onOpenAuth }: Props) {
   const {
     chats,
     activeChatId,
@@ -82,31 +83,36 @@ export function Sidebar({ open, onToggle, onOpenSettings, onOpenAuth }: Props) {
   return (
     <aside
       className={cn(
-        "h-full bg-sidebar text-sidebar-foreground border-r border-sidebar-border flex flex-col overflow-hidden transition-[width] duration-300 ease-out",
-        open ? "w-[260px]" : "w-0 md:w-[56px]"
+        "h-full w-[260px] min-w-[260px] bg-sidebar text-sidebar-foreground border-r border-sidebar-border flex flex-col overflow-hidden"
       )}
     >
       {/* Header */}
-      <div className="h-14 flex items-center px-3 shrink-0">
-        <div className="flex items-center gap-2 flex-1 min-w-0">
-          <button
-            onClick={onToggle}
-            className="h-8 w-8 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-sidebar-accent transition-colors"
-            aria-label="Toggle sidebar"
-          >
-            {open ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}
-          </button>
-          {open && (
-            <div className="flex items-center gap-2 min-w-0">
-              <Logo size={18} />
-              <span className="font-serif text-[17px] font-medium tracking-tight truncate">
-                Exics
-              </span>
-            </div>
+      <div className="h-14 flex items-center px-3 shrink-0 gap-2">
+        <button
+          type="button"
+          onClick={onNewChat}
+          className={cn(
+            "flex items-center gap-2.5 min-w-0 flex-1 rounded-md py-1.5 px-1 -mx-1",
+            "hover:bg-sidebar-accent transition-colors text-left",
+            !open && "justify-center flex-none",
           )}
-        </div>
+          title="New chat"
+        >
+          <Logo size={open ? 22 : 20} />
+          {open && (
+            <span className="font-serif text-[19px] font-medium tracking-tight truncate text-foreground">
+              Exics
+            </span>
+          )}
+        </button>
+        <button
+          onClick={onToggle}
+          className="h-8 w-8 shrink-0 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-sidebar-accent transition-colors"
+          aria-label="Toggle sidebar"
+        >
+          {open ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}
+        </button>
       </div>
-
       {/* New chat / Search */}
       <div className="px-2 space-y-1">
         <SidebarButton
@@ -250,11 +256,14 @@ export function Sidebar({ open, onToggle, onOpenSettings, onOpenAuth }: Props) {
           />
         )}
         {open && user && (
-          <div className="mt-2 px-2 py-2 flex items-center gap-2 text-xs text-muted-foreground">
-            <div className="h-6 w-6 rounded-full bg-accent flex items-center justify-center text-[11px] text-foreground">
+          <div className="mt-2 px-2 py-2 flex items-center gap-2 min-w-0">
+            <div className="h-8 w-8 shrink-0 rounded-full bg-accent flex items-center justify-center text-[11px] text-foreground font-medium">
               {user.name.slice(0, 1).toUpperCase()}
             </div>
-            <span className="truncate">{user.email}</span>
+            <div className="min-w-0">
+              <p className="text-xs text-foreground truncate leading-tight">{user.name}</p>
+              <p className="text-[11px] text-muted-foreground truncate">{user.email}</p>
+            </div>
           </div>
         )}
       </div>

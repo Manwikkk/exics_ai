@@ -36,8 +36,7 @@
   --color-sidebar-border: var(--sidebar-border);
 }
 
-/* Dark-only Claude-inspired palette */
-:root,
+/* Dark Claude-inspired palette — .dark only (never :root, or it overrides .light) */
 .dark {
   --radius: 0.75rem;
   /* very muted charcoal */
@@ -73,11 +72,50 @@
   --sidebar-foreground: oklch(0.88 0.01 80);
   --sidebar-accent: oklch(0.235 0.006 60);
   --sidebar-border: oklch(0.24 0.006 60);
+  --code-bg: oklch(0.155 0.008 60);
+  --code-fg: oklch(0.9 0.015 85);
+  --code-inline-bg: oklch(0.24 0.008 60);
+  --code-inline-fg: oklch(0.88 0.02 85);
+}
+
+/* Light theme — warm neutral workspace (after .dark so it wins on html.light) */
+.light {
+  --radius: 0.75rem;
+  --background: oklch(0.988 0.003 90);
+  --foreground: oklch(0.18 0.022 55);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.18 0.022 55);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.18 0.022 55);
+  --primary: oklch(0.45 0.11 45);
+  --primary-foreground: oklch(0.99 0.002 90);
+  --secondary: oklch(0.96 0.005 90);
+  --secondary-foreground: oklch(0.22 0.022 55);
+  --muted: oklch(0.96 0.005 90);
+  --muted-foreground: oklch(0.38 0.022 55);
+  --accent: oklch(0.945 0.008 90);
+  --accent-foreground: oklch(0.18 0.022 55);
+  --destructive: oklch(0.52 0.2 25);
+  --destructive-foreground: oklch(0.99 0 0);
+  --border: oklch(0.895 0.008 90);
+  --input: oklch(0.975 0.004 90);
+  --ring: oklch(0.58 0.04 55);
+  --sidebar: oklch(0.978 0.004 90);
+  --sidebar-foreground: oklch(0.24 0.022 55);
+  --sidebar-accent: oklch(0.945 0.008 90);
+  --sidebar-border: oklch(0.895 0.008 90);
+  --code-bg: oklch(0.97 0.01 265);
+  --code-fg: oklch(0.22 0.045 265);
+  --code-inline-bg: oklch(0.945 0.012 265);
+  --code-inline-fg: oklch(0.28 0.05 265);
 }
 
 @layer base {
-  html {
+  html.dark {
     color-scheme: dark;
+  }
+  html.light {
+    color-scheme: light;
   }
   * {
     border-color: var(--color-border);
@@ -94,11 +132,17 @@
     background-color: oklch(0.4 0.05 60);
     color: var(--color-foreground);
   }
+  html.light ::selection {
+    background-color: oklch(0.88 0.04 55);
+    color: oklch(0.18 0.022 55);
+  }
   /* Custom scrollbar */
   ::-webkit-scrollbar { width: 10px; height: 10px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: oklch(0.28 0.006 60); border-radius: 8px; border: 2px solid transparent; background-clip: padding-box; }
   ::-webkit-scrollbar-thumb:hover { background: oklch(0.34 0.006 60); background-clip: padding-box; border: 2px solid transparent; }
+  html.light ::-webkit-scrollbar-thumb { background: oklch(0.82 0.01 85); }
+  html.light ::-webkit-scrollbar-thumb:hover { background: oklch(0.75 0.015 85); }
 }
 
 /* Markdown / prose styling for chat messages */
@@ -118,29 +162,89 @@
 .exics-prose h3 { font-size: 1.05rem; }
 .exics-prose p { margin: 0; }
 .exics-prose a { color: var(--color-primary); text-decoration: underline; text-underline-offset: 2px; text-decoration-thickness: 1px; }
+.exics-prose a.exics-web-source-link {
+  color: var(--color-muted-foreground);
+  text-decoration: none;
+}
+.exics-prose a.exics-web-source-link:hover {
+  color: var(--color-muted-foreground);
+}
+.exics-prose a.exics-web-source-link .exics-web-source-index {
+  color: color-mix(in oklch, var(--color-foreground) 80%, transparent);
+  text-decoration: none;
+}
+.exics-prose a.exics-web-source-link:hover .exics-web-source-index {
+  color: color-mix(in oklch, var(--color-foreground) 80%, transparent);
+  text-decoration: none;
+}
+.exics-prose a.exics-web-source-link .exics-web-source-title {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-color: var(--color-border);
+  text-decoration-thickness: 1px;
+}
+.exics-prose a.exics-web-source-link:hover .exics-web-source-title {
+  color: var(--color-primary);
+  text-decoration-color: var(--color-primary);
+}
 .exics-prose ul, .exics-prose ol { padding-left: 1.4em; }
 .exics-prose ul { list-style: disc; }
 .exics-prose ol { list-style: decimal; }
 .exics-prose li + li { margin-top: 0.3em; }
-.exics-prose code:not(pre code) {
-  background: var(--color-muted);
+.exics-prose .exics-inline-code,
+.exics-prose code.exics-inline-code {
+  background: var(--code-inline-bg);
+  color: var(--code-inline-fg);
   padding: 0.12em 0.38em;
   border-radius: 4px;
   font-size: 0.86em;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  border: 1px solid color-mix(in oklch, var(--color-border) 80%, transparent);
 }
-.exics-prose pre {
-  background: oklch(0.14 0.005 60);
+.exics-prose .exics-code-block,
+.exics-prose pre.exics-code-block {
+  background: var(--code-bg);
+  color: var(--code-fg);
   border: 1px solid var(--color-border);
   border-radius: 0.5rem;
   padding: 0.9rem 1rem;
   overflow-x: auto;
   font-size: 0.84rem;
   line-height: 1.6;
+  margin: 0.75em 0;
 }
-.exics-prose pre code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.exics-prose .exics-code-block code,
+.exics-prose pre.exics-code-block code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: inherit;
+  background: transparent;
+  padding: 0;
+  border: none;
+  font-size: inherit;
+}
 .exics-prose blockquote { border-left: 2px solid var(--color-border); padding-left: 0.9em; color: var(--color-muted-foreground); }
 .exics-prose table { width: 100%; border-collapse: collapse; font-size: 0.88em; }
 .exics-prose th, .exics-prose td { border: 1px solid var(--color-border); padding: 0.5em 0.7em; text-align: left; }
 .exics-prose th { background: var(--color-muted); font-weight: 600; }
 .exics-prose hr { border-color: var(--color-border); }
+
+/* Light-mode prose: explicit readable text (guards against variable cascade bugs) */
+html.light .exics-prose,
+html.light .exics-prose p,
+html.light .exics-prose li,
+html.light .exics-prose ul,
+html.light .exics-prose ol {
+  color: oklch(0.2 0.022 55);
+}
+html.light .exics-prose h1,
+html.light .exics-prose h2,
+html.light .exics-prose h3,
+html.light .exics-prose strong {
+  color: oklch(0.14 0.025 55);
+}
+html.light .exics-prose a:not(.exics-web-source-link) {
+  color: oklch(0.42 0.11 45);
+}
+html.light .exics-prose blockquote {
+  color: oklch(0.38 0.022 55);
+}

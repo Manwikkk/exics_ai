@@ -61,6 +61,8 @@ class QueryRequest(BaseModel):
     provider_api_key: Optional[str] = Field(None, max_length=512)
     # When false, do not use the server GROQ_API_KEY (user removed built-in Groq key)
     groq_use_server_default: bool = True
+    # Optional model override (e.g. gpt-4o, claude-opus-4-20250514)
+    model_name: Optional[str] = Field(None, max_length=128)
 
 
 # ── Chats ─────────────────────────────────────────────────────

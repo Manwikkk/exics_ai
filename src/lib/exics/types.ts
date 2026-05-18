@@ -10,8 +10,8 @@ export interface ModelInfo {
 export const MODELS: ModelInfo[] = [
   { id: "groq", name: "Groq", description: "Fast inference, free tier", badge: "Default" },
   { id: "gemini", name: "Google Gemini", description: "Fast and cheap inference" },
-  { id: "claude", name: "Anthropic", description: "Use any Claude model from your API" },
-  { id: "openai", name: "OpenAI", description: "Use any OpenAI model from your API" },
+  { id: "claude", name: "Anthropic", description: "Best for complex, multi-step tasks" },
+  { id: "openai", name: "OpenAI", description: "Great for everyday questions and drafts" },
 ];
 
 export interface Attachment {
@@ -28,6 +28,8 @@ export interface Citation {
   snippet?: string;
 }
 
+export type MessageMetaType = "status" | "normal";
+
 export interface ChatMessage {
   id: string;
   role: "user" | "assistant";
@@ -36,7 +38,17 @@ export interface ChatMessage {
   attachments?: Attachment[];
   citations?: Citation[];
   model?: ProviderId;
+  /** In-chat status rows (indexing, web search) — not persisted to backend */
+  meta?: {
+    type: MessageMetaType;
+    loading?: boolean;
+    statusKind?: "indexing" | "indexed" | "web_search";
+  };
 }
+
+export type ThemeMode = "dark" | "light";
+
+export type ProviderModels = Partial<Record<ProviderId, string>>;
 
 export interface Chat {
   id: string;

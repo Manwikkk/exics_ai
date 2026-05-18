@@ -1,7 +1,24 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
-import type { ApiKeys, Chat, ChatMessage, ProviderId, ProviderKeyStatus, User } from "./types";
+import type {
+  ApiKeys,
+  Chat,
+  ChatMessage,
+  ProviderId,
+  ProviderKeyStatus,
+  ProviderModels,
+  ThemeMode,
+  User,
+} from "./types";
+import { DEFAULT_PROVIDER_MODELS } from "./constants";
 import { getProviderStatus, setAuthToken } from "./api";
+import {
+  loadActiveChatId,
+  loadUserChats,
+  migrateLegacyChatsFromStore,
+  saveActiveChatId,
+  saveUserChats,
+} from "./chat-storage";
 
 function uid() {
   if (typeof crypto !== "undefined" && crypto.randomUUID) {
@@ -24,6 +41,33 @@ function pruneEmptyChats(chats: Chat[]): Chat[] {
   if (empty.length <= 1) return chats;
   const keepId = empty[0].id;
   return chats.filter((c) => !isEmptyChat(c) || c.id === keepId);
+}
+
+function resolveActiveChatId(chats: Chat[], preferred: string | null): string | null {
+  if (preferred && chats.some((c) => c.id === preferred)) return preferred;
+  return chats[0]?.id ?? null;
+}
+
+function chatStateForUser(user: User | null): Pick<ExicsState, "chats" | "activeChatId"> {
+  if (!user) {
+    return { chats: [], activeChatId: null };
+  }
+  const chats = pruneEmptyChats(loadUserChats(user.id));
+  const activeChatId = resolveActiveChatId(chats, loadActiveChatId(user.id));
+  return { chats, activeChatId };
+}
+
+function clearAuthSession(
+  set: (partial: Partial<ExicsState> | ((s: ExicsState) => Partial<ExicsState>)) => void,
+) {
+  set({
+    user: null,
+    authToken: null,
+    chats: [],
+    activeChatId: null,
+    incognitoChat: null,
+    incognito: false,
+  });
 }
 
 function findChatById(state: ExicsState, chatId: string): Chat | null {
@@ -65,6 +109,14 @@ interface ExicsState {
   selectedModel: ProviderId;
   setSelectedModel: (m: ProviderId) => void;
 
+  providerModels: ProviderModels;
+  setProviderModel: (provider: ProviderId, model: string) => void;
+  getProviderModel: (provider: ProviderId) => string;
+
+  theme: ThemeMode;
+  setTheme: (t: ThemeMode) => void;
+  toggleTheme: () => void;
+
   webSearchEnabled: boolean;
   toggleWebSearch: () => void;
 
@@ -92,6 +144,11 @@ interface ExicsState {
   clearAllChats: () => void;
   appendMessage: (chatId: string, msg: ChatMessage) => void;
   updateMessage: (chatId: string, msgId: string, patch: Partial<ChatMessage>) => void;
+  removeMessage: (chatId: string, msgId: string) => void;
+  clearLoadingStatusMessages: (
+    chatId: string,
+    statusKind?: "indexing" | "indexed" | "web_search",
+  ) => void;
   addDocIds: (chatId: string, docIds: string[], docNames: string[]) => void;
   migrateChatId: (oldId: string, newId: string) => void;
 }
@@ -114,20 +171,30 @@ export const useExics = create<ExicsState>()(
             });
             if (error) {
               console.error("Google sign-in error:", error);
-              // Fallback to demo user
+              const user = { id: "demo-user", name: "Guest User", email: "you@example.com" };
               set({
-                user: { id: "demo-user", name: "Guest User", email: "you@example.com" },
+                user,
+                incognito: false,
+                incognitoChat: null,
+                ...chatStateForUser(user),
               });
             }
           } else {
-            // No Supabase configured — use demo user
+            const user = { id: "demo-user", name: "Guest User", email: "you@example.com" };
             set({
-              user: { id: "demo-user", name: "Guest User", email: "you@example.com" },
+              user,
+              incognito: false,
+              incognitoChat: null,
+              ...chatStateForUser(user),
             });
           }
         } catch {
+          const user = { id: "demo-user", name: "Guest User", email: "you@example.com" };
           set({
-            user: { id: "demo-user", name: "Guest User", email: "you@example.com" },
+            user,
+            incognito: false,
+            incognitoChat: null,
+            ...chatStateForUser(user),
           });
         }
       },
@@ -140,51 +207,66 @@ export const useExics = create<ExicsState>()(
           // ignore
         }
         setAuthToken(null);
-        set({ user: null, authToken: null, activeChatId: null, incognitoChat: null });
+        clearAuthSession(set);
       },
 
       restoreSession: async () => {
+        migrateLegacyChatsFromStore();
         try {
           const sb = await getSupabase();
-          if (!sb) return;
+          if (!sb) {
+            clearAuthSession(set);
+            return;
+          }
           const { data } = await sb.auth.getSession();
           const session = data?.session;
           if (session?.user) {
             const u = session.user;
             const meta = u.user_metadata ?? {};
+            const user: User = {
+              id: u.id,
+              name: meta.full_name || meta.name || u.email || "",
+              email: u.email || "",
+              avatarUrl: meta.avatar_url,
+            };
             setAuthToken(session.access_token);
             set({
-              user: {
-                id: u.id,
-                name: meta.full_name || meta.name || u.email || "",
-                email: u.email || "",
-                avatarUrl: meta.avatar_url,
-              },
+              user,
               authToken: session.access_token,
+              incognito: false,
+              incognitoChat: null,
+              ...chatStateForUser(user),
             });
+          } else {
+            setAuthToken(null);
+            clearAuthSession(set);
           }
-          // Listen for auth changes
           sb.auth.onAuthStateChange((_event: string, session: any) => {
             if (session?.user) {
               const u = session.user;
               const meta = u.user_metadata ?? {};
+              const user: User = {
+                id: u.id,
+                name: meta.full_name || meta.name || u.email || "",
+                email: u.email || "",
+                avatarUrl: meta.avatar_url,
+              };
+              const prevId = get().user?.id;
               setAuthToken(session.access_token);
               set({
-                user: {
-                  id: u.id,
-                  name: meta.full_name || meta.name || u.email || "",
-                  email: u.email || "",
-                  avatarUrl: meta.avatar_url,
-                },
+                user,
                 authToken: session.access_token,
+                incognito: false,
+                incognitoChat: null,
+                ...(prevId === user.id ? {} : chatStateForUser(user)),
               });
             } else {
               setAuthToken(null);
-              set({ user: null, authToken: null });
+              clearAuthSession(set);
             }
           });
         } catch {
-          // ignore
+          clearAuthSession(set);
         }
       },
 
@@ -200,6 +282,24 @@ export const useExics = create<ExicsState>()(
 
       selectedModel: "groq",
       setSelectedModel: (m) => set({ selectedModel: m }),
+
+      providerModels: { ...DEFAULT_PROVIDER_MODELS },
+      setProviderModel: (provider, model) =>
+        set((s) => ({
+          providerModels: { ...s.providerModels, [provider]: model.trim() },
+        })),
+      getProviderModel: (provider) => {
+        const s = get();
+        return (
+          s.providerModels[provider]?.trim() ||
+          DEFAULT_PROVIDER_MODELS[provider]
+        );
+      },
+
+      theme: "dark",
+      setTheme: (t) => set({ theme: t }),
+      toggleTheme: () =>
+        set((s) => ({ theme: s.theme === "dark" ? "light" : "dark" })),
 
       webSearchEnabled: false,
       toggleWebSearch: () => set((s) => ({ webSearchEnabled: !s.webSearchEnabled })),
@@ -225,11 +325,31 @@ export const useExics = create<ExicsState>()(
 
       incognito: false,
       toggleIncognito: () =>
-        set((s) => ({
-          incognito: !s.incognito,
-          incognitoChat: !s.incognito ? null : s.incognitoChat,
-          activeChatId: !s.incognito ? null : s.activeChatId,
-        })),
+        set((s) => {
+          if (s.incognito) {
+            return {
+              incognito: false,
+              incognitoChat: null,
+              activeChatId: s.chats[0]?.id ?? null,
+            };
+          }
+          const id = uid();
+          const chat: Chat = {
+            id,
+            title: "Incognito chat",
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+            messages: [],
+            model: s.selectedModel,
+            docIds: [],
+            docNames: [],
+          };
+          return {
+            incognito: true,
+            incognitoChat: chat,
+            activeChatId: id,
+          };
+        }),
 
       chats: [],
       incognitoChat: null,
@@ -331,6 +451,51 @@ export const useExics = create<ExicsState>()(
           };
         }),
 
+      removeMessage: (chatId, msgId) =>
+        set((s) => {
+          const drop = (messages: ChatMessage[]) =>
+            messages.filter((m) => m.id !== msgId);
+          if (s.incognito && s.incognitoChat?.id === chatId) {
+            return {
+              incognitoChat: {
+                ...s.incognitoChat,
+                messages: drop(s.incognitoChat.messages),
+              },
+            };
+          }
+          return {
+            chats: s.chats.map((c) =>
+              c.id === chatId ? { ...c, messages: drop(c.messages) } : c,
+            ),
+          };
+        }),
+
+      clearLoadingStatusMessages: (chatId, statusKind) =>
+        set((s) => {
+          const prune = (messages: ChatMessage[]) =>
+            messages.filter(
+              (m) =>
+                !(
+                  m.meta?.type === "status" &&
+                  m.meta.loading &&
+                  (!statusKind || m.meta.statusKind === statusKind)
+                ),
+            );
+          if (s.incognito && s.incognitoChat?.id === chatId) {
+            return {
+              incognitoChat: {
+                ...s.incognitoChat,
+                messages: prune(s.incognitoChat.messages),
+              },
+            };
+          }
+          return {
+            chats: s.chats.map((c) =>
+              c.id === chatId ? { ...c, messages: prune(c.messages) } : c,
+            ),
+          };
+        }),
+
       addDocIds: (chatId, docIds, docNames) =>
         set((s) => {
           if (s.incognito && s.incognitoChat?.id === chatId) {
@@ -388,13 +553,30 @@ export const useExics = create<ExicsState>()(
         apiKeys: s.apiKeys,
         groqDefaultDisabled: s.groqDefaultDisabled,
         selectedModel: s.selectedModel,
+        providerModels: s.providerModels,
+        theme: s.theme,
         webSearchEnabled: s.webSearchEnabled,
-        chats: pruneEmptyChats(s.chats),
-        activeChatId: s.activeChatId,
       }),
       onRehydrateStorage: () => (state) => {
-        if (state?.chats) {
-          state.chats = pruneEmptyChats(state.chats);
+        migrateLegacyChatsFromStore();
+        if (state?.user?.id) {
+          const scoped = chatStateForUser(state.user);
+          state.chats = scoped.chats;
+          state.activeChatId = scoped.activeChatId;
+        } else {
+          state.chats = [];
+          state.activeChatId = null;
+        }
+        if (state?.providerModels) {
+          const deprecatedGroq = new Set([
+            "llama-3.1-70b-versatile",
+            "llama3-70b-8192",
+            "llama3-8b-8192",
+          ]);
+          const groqModel = state.providerModels.groq?.trim();
+          if (!groqModel || deprecatedGroq.has(groqModel)) {
+            state.providerModels.groq = DEFAULT_PROVIDER_MODELS.groq;
+          }
         }
       },
     }
@@ -411,3 +593,12 @@ export function getActiveChat(state: ExicsState): Chat | null {
 export function newId() {
   return uid();
 }
+
+// Persist chat history only for signed-in users (per account).
+useExics.subscribe((state, prev) => {
+  const userId = state.user?.id;
+  if (!userId) return;
+  if (state.chats === prev.chats && state.activeChatId === prev.activeChatId) return;
+  saveUserChats(userId, pruneEmptyChats(state.chats));
+  saveActiveChatId(userId, state.activeChatId);
+});
